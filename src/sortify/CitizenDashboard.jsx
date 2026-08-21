@@ -1,3 +1,6 @@
+import ReadyForPickupForm from "./components/ReadyForPickupForm";
+import ReportIssueForm from "./components/ReportIssueForm";
+import MyRequestsAndReports from "./components/MyRequestsAndReports";
 import HomeOverview from "./components/HomeOverview";
 import SegregationScore from "./components/SegregationScore";
 import RewardsStreak from "./components/RewardsStreak";
@@ -16,10 +19,15 @@ export default function CitizenDashboard() {
           <SegregationScore />
           <RewardsStreak />
         </div>
-        <div className="grid md:grid-cols-2 gap-4">
+                <div className="grid md:grid-cols-2 gap-4">
           <SocietyLeaderboard />
           <DisposalGuide />
         </div>
+        <div className="grid md:grid-cols-2 gap-4">
+          <ReadyForPickupForm />
+          <ReportIssueForm />
+        </div>
+        <MyRequestsAndReports />
       </div>
     </div>
   );
