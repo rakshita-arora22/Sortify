@@ -87,6 +87,13 @@ export function subscribeToCitizen(citizenId, callback) {
   );
 }
 
+// Crew dashboard: Segregation Check per-bin toggle
+export async function setSegregationCheck(binId, { segregated, reason = "" }) {
+  await updateDoc(doc(db, "bins", binId), {
+    segregationCheck: { segregated, reason, checkedAt: serverTimestamp() },
+  });
+}
+
 // Municipal dashboard: City Overview stat cards
 export async function getCityStats() {
   const snap = await getDoc(doc(db, "cityStats", "current"));

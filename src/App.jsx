@@ -1,12 +1,6 @@
 import { BrowserRouter, Routes, Route, Link } from "react-router-dom";
-import MunicipalDashboard from "./sortify/MunicipalDashboard";
 import CitizenDashboard from "./sortify/CitizenDashboard";
-
-// Minimal app shell — Person 6 owns the real Landing Page + shared map +
-// Tailwind theme tokens per the task brief. This is a stopgap scaffold so
-// the repo is runnable while everyone's dashboards land; restyle freely,
-// just keep the three routes (/citizen, /crew, /municipal) since that's
-// what the role-select buttons need to point to.
+import CrewDashboard from "./sortify/CrewDashboard";
 
 function Landing() {
   return (
@@ -45,8 +39,8 @@ export default function App() {
       <Routes>
         <Route path="/" element={<Landing />} />
         <Route path="/citizen" element={<CitizenDashboard />} />
-        <Route path="/crew" element={<Placeholder role="Crew" />} />
-        <Route path="/municipal" element={<MunicipalDashboard />} />
+        <Route path="/crew" element={<CrewDashboard />} />
+        <Route path="/municipal" element={<Placeholder role="Municipal" />} />
       </Routes>
     </BrowserRouter>
   );

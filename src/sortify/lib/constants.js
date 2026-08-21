@@ -42,3 +42,8 @@ export const CURRENT_CITIZEN_ID = "citizen-1";
 // Subset of WASTE_TYPES — e-waste is tracked at the bin/pickup level but
 // isn't part of the personal segregation score.
 export const SEGREGATION_CATEGORIES = ["wet", "dry", "recyclable", "hazardous"];
+
+// Crew dashboard: Smart Route Optimization needs a fixed starting point to
+// calculate distances from. Mock depot coordinate — swap for a real one if
+// the team wants a specific city.
+export const DEPOT = { lat: 18.5204, lng: 73.8567 };
