@@ -1,4 +1,5 @@
 import { BrowserRouter, Routes, Route, Link } from "react-router-dom";
+import MunicipalDashboard from "./sortify/MunicipalDashboard";
 import CitizenDashboard from "./sortify/CitizenDashboard";
 
 // Minimal app shell — Person 6 owns the real Landing Page + shared map +
@@ -45,7 +46,7 @@ export default function App() {
         <Route path="/" element={<Landing />} />
         <Route path="/citizen" element={<CitizenDashboard />} />
         <Route path="/crew" element={<Placeholder role="Crew" />} />
-        <Route path="/municipal" element={<Placeholder role="Municipal" />} />
+        <Route path="/municipal" element={<MunicipalDashboard />} />
       </Routes>
     </BrowserRouter>
   );
