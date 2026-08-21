@@ -1,0 +1,206 @@
+/**
+ * routeOptimization.js
+ * Crew Dashboard — Smart Route Optimization
+ *
+ * Framework-agnostic. Import into React (useEffect/hook), a Cloud Function,
+ * or run standalone against mock data.
+ *
+ * Usage:
+ *   import { buildTodaysRoute } from './routeOptimization.js';
+ *   const route = buildTodaysRoute({ bins, pickupRequests, depot });
+ *   route.smart.orderedStops    -> stops in visit order
+ *   route.smart.stats           -> { stopCount, totalDistanceKm, estimatedTimeMin, fuelEstimateL }
+ *   route.fixed.stats           -> same shape, for the unoptimized baseline
+ *   route.percentDistanceSaved  -> the demo's "wow" number
+ */
+
+// ---------- Tunable constants (adjust for demo realism) ----------
+const AVG_SPEED_KMH = 25;            // urban collection truck average speed
+const SERVICE_TIME_MIN_PER_STOP = 3; // time spent actually emptying a bin
+const FUEL_L_PER_KM = 0.15;          // rough consumption, small collection truck
+
+const WASTE_TYPE_PRIORITY = {
+  hazardous: 1.0,
+  mixed: 0.8,       // flagged improperly segregated on a previous check
+  dry: 0.5,
+  recyclable: 0.45,
+  wet: 0.4,
+};
+
+const WEIGHTS = { fill: 0.5, wasteType: 0.3, proximity: 0.2 };
+const DEFAULT_FILL_THRESHOLD = 60; // % — bins below this aren't included today
+
+// ---------- Distance helpers ----------
+// Use this if lat/lng are real-world GPS degrees.
+export function haversineDistanceKm(a, b) {
+  const R = 6371;
+  const dLat = ((b.lat - a.lat) * Math.PI) / 180;
+  const dLng = ((b.lng - a.lng) * Math.PI) / 180;
+  const lat1 = (a.lat * Math.PI) / 180;
+  const lat2 = (b.lat * Math.PI) / 180;
+  const h =
+    Math.sin(dLat / 2) ** 2 +
+    Math.cos(lat1) * Math.cos(lat2) * Math.sin(dLng / 2) ** 2;
+  return 2 * R * Math.asin(Math.sqrt(h));
+}
+
+// Use this instead if your mock coordinates are a local x/y grid
+// where 1 unit = 1 km (often simpler for a hackathon demo).
+export function planarDistanceKm(a, b) {
+  return Math.hypot(b.lat - a.lat, b.lng - a.lng);
+}
+
+// Flip this to planarDistanceKm if you're using mock grid coordinates.
+const distanceKm = haversineDistanceKm;
+
+// ---------- Step 1: merge bins + pickup requests, score priority ----------
+function normalizeStops(bins = [], pickupRequests = []) {
+  const binStops = bins
+    .filter((b) => b.status !== 'collected' && b.fillPercent >= DEFAULT_FILL_THRESHOLD)
+    .map((b) => ({
+      id: b.id,
+      type: 'bin',
+      lat: b.lat,
+      lng: b.lng,
+      fillPercent: b.fillPercent,
+      wasteType: b.wasteType,
+    }));
+
+  const pickupStops = pickupRequests
+    .filter((p) => p.status === 'pending')
+    .map((p) => ({
+      id: p.id,
+      type: 'pickup',
+      lat: p.lat,
+      lng: p.lng,
+      fillPercent: 100, // a citizen explicitly flagged it — treat as urgent
+      wasteType: p.category,
+    }));
+
+  return [...binStops, ...pickupStops];
+}
+
+function priorityScore(stop, depot) {
+  const fillScore = (stop.fillPercent ?? 0) / 100;
+  const wasteScore = WASTE_TYPE_PRIORITY[stop.wasteType] ?? 0.5;
+  const distFromDepot = distanceKm(depot, stop);
+  const proximityScore = 1 / (1 + distFromDepot); // closer to depot -> higher
+
+  return (
+    WEIGHTS.fill * fillScore +
+    WEIGHTS.wasteType * wasteScore +
+    WEIGHTS.proximity * proximityScore
+  );
+}
+
+export function selectStopsForRoute({ bins, pickupRequests, depot, maxStops }) {
+  const stops = normalizeStops(bins, pickupRequests).map((s) => ({
+    ...s,
+    priority: priorityScore(s, depot),
+  }));
+  stops.sort((a, b) => b.priority - a.priority);
+  return maxStops ? stops.slice(0, maxStops) : stops;
+}
+
+// ---------- Step 2: sequence the stops ----------
+function totalSequentialDistance(orderedStops, depot) {
+  let total = 0;
+  let current = depot;
+  for (const stop of orderedStops) {
+    total += distanceKm(current, stop);
+    current = stop;
+  }
+  total += distanceKm(current, depot); // return to depot
+  return total;
+}
+
+export function nearestNeighborOrder(stops, depot) {
+  const unvisited = [...stops];
+  const ordered = [];
+  let current = depot;
+
+  while (unvisited.length) {
+    let nearestIdx = 0;
+    let nearestDist = Infinity;
+    unvisited.forEach((stop, i) => {
+      const d = distanceKm(current, stop);
+      if (d < nearestDist) {
+        nearestDist = d;
+        nearestIdx = i;
+      }
+    });
+    const [next] = unvisited.splice(nearestIdx, 1);
+    ordered.push(next);
+    current = next;
+  }
+
+  return ordered;
+}
+
+// ---------- Step 3: stats + fixed-vs-smart comparison ----------
+function routeStats(orderedStops, depot) {
+  const totalDistanceKm = totalSequentialDistance(orderedStops, depot);
+  const stopCount = orderedStops.length;
+  const estimatedTimeMin =
+    (totalDistanceKm / AVG_SPEED_KMH) * 60 + stopCount * SERVICE_TIME_MIN_PER_STOP;
+  const fuelEstimateL = totalDistanceKm * FUEL_L_PER_KM;
+
+  return {
+    stopCount,
+    totalDistanceKm: Number(totalDistanceKm.toFixed(2)),
+    estimatedTimeMin: Math.round(estimatedTimeMin),
+    fuelEstimateL: Number(fuelEstimateL.toFixed(2)),
+  };
+}
+
+/**
+ * Ties everything together. Call once bins + pickupRequests are loaded
+ * from Firestore for the day.
+ *
+ * depot = { lat, lng } — the truck's starting point.
+ */
+export function buildTodaysRoute({ bins, pickupRequests, depot, maxStops = 20 }) {
+  const selected = selectStopsForRoute({ bins, pickupRequests, depot, maxStops });
+
+  // "Fixed route" baseline = stops in the order they came in — mirrors
+  // how a dispatcher without this tool would go street-by-street/ward order.
+  const fixedOrdered = selected;
+  const fixedStats = routeStats(fixedOrdered, depot);
+
+  const smartOrdered = nearestNeighborOrder(selected, depot);
+  const smartStats = routeStats(smartOrdered, depot);
+
+  const percentDistanceSaved =
+    fixedStats.totalDistanceKm === 0
+      ? 0
+      : Number(
+          (
+            ((fixedStats.totalDistanceKm - smartStats.totalDistanceKm) /
+              fixedStats.totalDistanceKm) *
+            100
+          ).toFixed(1)
+        );
+
+  return {
+    fixed: { orderedStops: fixedOrdered, stats: fixedStats },
+    smart: { orderedStops: smartOrdered, stats: smartStats },
+    percentDistanceSaved,
+  };
+}
+
+ /*---------- Example usage ----------
+const depot = { lat: 18.5204, lng: 73.8567 }; // Pune depot, for example
+
+const bins = [
+  { id: 'b1', lat: 18.5245, lng: 73.8677, fillPercent: 82, wasteType: 'dry', status: 'pending' },
+  { id: 'b2', lat: 18.5089, lng: 73.8259, fillPercent: 91, wasteType: 'hazardous', status: 'pending' },
+  { id: 'b3', lat: 18.5314, lng: 73.8446, fillPercent: 65, wasteType: 'wet', status: 'pending' },
+];
+
+const pickupRequests = [
+  { id: 'p1', lat: 18.5100, lng: 73.8300, category: 'recyclable', status: 'pending' },
+];
+
+const route = buildTodaysRoute({ bins, pickupRequests, depot });
+console.log(route.percentDistanceSaved, '% distance saved');
+------------------------------------ */
