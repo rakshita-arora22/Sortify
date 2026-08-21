@@ -113,13 +113,3 @@ Built in a time-boxed hackathon, so a few pieces are intentionally simulated rat
 - **Anomaly detection uses fixed thresholds** rather than statistical baselines.
 - **Reward points are simulated**, with no real redemption mechanism yet.
 
-## Team
-
-| Role | Owner |
-|---|---|
-| Backend / Data Lead | Soumya |
-| Citizen Dashboard (Core) | Rakshita |
-| Citizen Dashboard (AI + Requests) | Hemakshi |
-| Crew Dashboard | Stuti |
-| Municipal Dashboard | Mehek |
-| Shared Infrastructure, Map & Deploy | Shreya |
