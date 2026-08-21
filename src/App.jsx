@@ -1,6 +1,7 @@
 import { BrowserRouter, Routes, Route, Link } from "react-router-dom";
 import CitizenDashboard from "./sortify/CitizenDashboard";
 import CrewDashboard from "./sortify/CrewDashboard";
+import MunicipalDashboard from "./sortify/MunicipalDashboard";
 
 function Landing() {
   return (
@@ -40,7 +41,7 @@ export default function App() {
         <Route path="/" element={<Landing />} />
         <Route path="/citizen" element={<CitizenDashboard />} />
         <Route path="/crew" element={<CrewDashboard />} />
-        <Route path="/municipal" element={<Placeholder role="Municipal" />} />
+        <Route path="/municipal" element={<MunicipalDashboard />} />
       </Routes>
     </BrowserRouter>
   );
